@@ -28,7 +28,7 @@ Install packages, and set file permission 755.
 
 Exec command like this.
 
-    $ ./ssh_connector hoge
+    $ ./ssh_connector -t hoge
     ###############################
     iplist: iplist.xlsx
     
@@ -45,3 +45,6 @@ Connect target host and automatically get SSH terminal log in `log` directory.
     total 4
     -rw-r--r--. 1 user user 45 Feb 21 02:55 hogehoge.jp_20180221025502.log
 
+If you can specify by exact hostname, exec like this.
+
+    $ ./ssh_connector -s hogehoge.jp
