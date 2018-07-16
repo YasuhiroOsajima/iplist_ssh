@@ -1,0 +1,143 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from __future__ import division, print_function, absolute_import, unicode_literals
+import argparse
+import re
+import subprocess
+import sys
+
+from lib.iplist_searcher import IPlistSearcher
+from lib.prepare_logfile import PrepareLogfile
+
+
+def _print_choose_targethost(iplist_infos):
+    order = {}
+    idx = 0
+    for iplist, hostinfo_sheets in iplist_infos.items():
+        print('###############################')
+        print('iplist: {}\n'.format(iplist))
+
+        for hostinfo in hostinfo_sheets:
+            idx += 1
+            order[idx] = hostinfo
+            print("    {index}:  {host}  {address}".format(index=str(idx),
+                                                           host=hostinfo.name,
+                                                           address=hostinfo.ipaddress))
+        print('###############################')
+
+    try:
+        input_number = input('Please select target host no. >>>  ')
+        input_number = int(input_number)
+        if input_number not in order:
+            raise KeyError
+    except (NameError, KeyError, KeyboardInterrupt, SyntaxError):
+        print('')
+        print('Invalid number was inputed.')
+        sys.exit(1)
+
+    target_hostinfo = order[input_number]
+    print('Connect to {host} : {ip}.'.format(host=target_hostinfo.name,
+                                             ip=target_hostinfo.ipaddress))
+    return target_hostinfo
+
+
+def _sepalate_hitting_host(all_hostinfos, part_of_host):
+    """ Get pattern matched hostname's ipaddress from all iplist files. """
+    new_iplist_infos = {}
+    for iplist, hostinfo_sheets in all_hostinfos.items():
+        iplist_hostinfos = []
+        for sheet in hostinfo_sheets:
+            for hostinfo in sheet:
+                if re.findall(part_of_host, hostinfo.name):
+                    iplist_hostinfos.append(hostinfo)
+
+        if iplist_hostinfos:
+            new_iplist_infos[iplist] = iplist_hostinfos
+
+    if not new_iplist_infos:
+        print('No target hosts were found.')
+        sys.exit(1)
+
+    return new_iplist_infos
+
+
+def select_targethost(part_of_host):
+    all_hostinfos = IPlistSearcher().get_hostinfos()
+    if not all_hostinfos:
+        print('Host information are nothing.')
+        sys.exit(1)
+
+    iplist_infos = _sepalate_hitting_host(all_hostinfos, part_of_host)
+    target_hostinfo = _print_choose_targethost(iplist_infos)
+    return target_hostinfo
+
+
+def connect_ssh(key, port, user, target_hostinfo=None, server=None):
+    if target_hostinfo:
+        target_hostname = target_hostinfo.name
+        target_ip = target_hostinfo.ipaddress
+    elif server:
+        target_hostname = server
+        target_ip = server
+
+    logfile_path = PrepareLogfile().prepare_logfile(target_hostname)
+
+    cmd = 'script -fq -c "ssh '
+
+    if key:
+        cmd = cmd + "-i {} ".format(key)
+
+    if port:
+        cmd = cmd + "-p {} ".format(port)
+
+    if user:
+        cmd = cmd + "{user}@{ipaddress} ".format(user=user, ipaddress=target_ip)
+    else:
+        cmd = cmd + target_ip
+
+    cmd = cmd + '" {}'.format(logfile_path)
+
+    print('===================================================================')
+    subprocess.call(cmd, shell=True)
+    sys.exit(0)
+
+
+def main(target_host, priv_key, ssh_port, ssh_user, servername):
+    if servername:
+        connect_ssh(priv_key, ssh_port, ssh_user, server=servername)
+    elif target_host:
+        target_hostinfo = select_targethost(target_host)
+        connect_ssh(priv_key, ssh_port, ssh_user, target_hostinfo)
+    else:
+        print('No target host was specified.')
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    USAGE = ("\nPlease specify target hostname: \n"
+             "   $ python ssh_connector.py -t hogehoge")
+    DESCRIPTION = '<< SSH client wrapper tool with using iplist. >>'
+
+    parser = argparse.ArgumentParser(prog='ssh_connector',
+                                     usage=USAGE,
+                                     epilog='end',
+                                     add_help=True,
+                                     description=DESCRIPTION)
+    parser.add_argument('-t', '--targethost', type=str, help='ssh target hostname.')
+    parser.add_argument('-i', '--key', type=str, help='auth secret key.')
+    parser.add_argument('-p', '--port', type=str, help='ssh port.')
+    parser.add_argument('-u', '--user', type=str, help='ssh login user.')
+    parser.add_argument('-s', '--server', type=str,
+                        help='ssh login target server.\n'
+                             'if specified this option, this command connects to '
+                             'the server directly without searching IP lists.')
+
+    args_instance = parser.parse_args()
+    target_host = args_instance.targethost
+    key = args_instance.key
+    port = args_instance.port
+    user = args_instance.user
+    server = args_instance.server
+
+    main(target_host, key, port, user, server)
