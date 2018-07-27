@@ -1,3 +1,5 @@
 *.pyc
 log/
 cachefile
+.DS_Store
+listfiles/*

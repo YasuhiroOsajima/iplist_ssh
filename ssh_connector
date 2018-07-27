@@ -3,6 +3,7 @@
 
 from __future__ import division, print_function, absolute_import, unicode_literals
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -73,6 +74,47 @@ def select_targethost(part_of_host):
     return target_hostinfo
 
 
+def _gen_linux_command(sshcmd, logfile_path):
+    cmd = 'script -fq -c "'
+    cmd = cmd + sshcmd + '" {}'.format(logfile_path)
+
+    return cmd
+
+
+def _gen_mac_command(sshcmd, logfile_path):
+    cmd = 'script -q {} '.format(logfile_path)
+    cmd = cmd + sshcmd
+    return cmd
+
+
+def _is_linux():
+    return os.path.isfile('/usr/lib/os-release')
+
+
+def gen_connect_command(key, port, user, target_ip, logfile_path):
+    sshcmd = 'ssh '
+
+    if key:
+        sshcmd = sshcmd + "-i {} ".format(key)
+
+    if port:
+        sshcmd = sshcmd + "-p {} ".format(port)
+
+    if user:
+        sshcmd = sshcmd + "{user}@{ipaddress} ".format(user=user, ipaddress=target_ip)
+    else:
+        sshcmd = sshcmd + target_ip
+
+    sshcmd = sshcmd+ ' '
+
+    if _is_linux():
+        cmd = _gen_linux_command(sshcmd, logfile_path)
+    else:
+        cmd = _gen_mac_command(sshcmd, logfile_path)
+
+    return cmd
+
+
 def connect_ssh(key, port, user, target_hostinfo=None, server=None):
     if target_hostinfo:
         target_hostname = target_hostinfo.name
@@ -82,21 +124,7 @@ def connect_ssh(key, port, user, target_hostinfo=None, server=None):
         target_ip = server
 
     logfile_path = PrepareLogfile().prepare_logfile(target_hostname)
-
-    cmd = 'script -fq -c "ssh '
-
-    if key:
-        cmd = cmd + "-i {} ".format(key)
-
-    if port:
-        cmd = cmd + "-p {} ".format(port)
-
-    if user:
-        cmd = cmd + "{user}@{ipaddress} ".format(user=user, ipaddress=target_ip)
-    else:
-        cmd = cmd + target_ip
-
-    cmd = cmd + '" {}'.format(logfile_path)
+    cmd = gen_connect_command(key, port, user, target_ip, logfile_path)
 
     print('===================================================================')
     subprocess.call(cmd, shell=True)
