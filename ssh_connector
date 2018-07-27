@@ -32,7 +32,7 @@ def _print_choose_targethost(iplist_infos):
         input_number = int(input_number)
         if input_number not in order:
             raise KeyError
-    except (NameError, KeyError, KeyboardInterrupt, SyntaxError):
+    except (NameError, KeyError, KeyboardInterrupt, SyntaxError, ValueError):
         print('')
         print('Invalid number was inputed.')
         sys.exit(1)
