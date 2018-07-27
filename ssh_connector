@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 from __future__ import division, print_function, absolute_import, unicode_literals
@@ -73,28 +73,6 @@ def select_targethost(part_of_host):
     return target_hostinfo
 
 
-def gen_connect_command(key, port, user, target_ip, logfile_path):
-    sshcmd = 'ssh '
-
-    if key:
-        sshcmd = sshcmd + "-i {} ".format(key)
-
-    if port:
-        sshcmd = sshcmd + "-p {} ".format(port)
-
-    if user:
-        sshcmd = sshcmd + "{user}@{ipaddress} ".format(user=user, ipaddress=target_ip)
-    else:
-        sshcmd = sshcmd + target_ip
-
-    sshcmd = sshcmd+ ' '
-
-    cmd = 'script -q {} '.format(logfile_path)
-    cmd = cmd + sshcmd
-
-    return cmd
-
-
 def connect_ssh(key, port, user, target_hostinfo=None, server=None):
     if target_hostinfo:
         target_hostname = target_hostinfo.name
@@ -104,23 +82,21 @@ def connect_ssh(key, port, user, target_hostinfo=None, server=None):
         target_ip = server
 
     logfile_path = PrepareLogfile().prepare_logfile(target_hostname)
-    cmd = gen_connect_command(key, port, user, target_ip, logfile_path)
 
-    ##cmd = 'script -fq -c "ssh '
-    #cmd = 'script -q "ssh '
+    cmd = 'script -fq -c "ssh '
 
-    #if key:
-    #    cmd = cmd + "-i {} ".format(key)
+    if key:
+        cmd = cmd + "-i {} ".format(key)
 
-    #if port:
-    #    cmd = cmd + "-p {} ".format(port)
+    if port:
+        cmd = cmd + "-p {} ".format(port)
 
-    #if user:
-    #    cmd = cmd + "{user}@{ipaddress} ".format(user=user, ipaddress=target_ip)
-    #else:
-    #    cmd = cmd + target_ip
+    if user:
+        cmd = cmd + "{user}@{ipaddress} ".format(user=user, ipaddress=target_ip)
+    else:
+        cmd = cmd + target_ip
 
-    #cmd = cmd + '" {}'.format(logfile_path)
+    cmd = cmd + '" {}'.format(logfile_path)
 
     print('===================================================================')
     subprocess.call(cmd, shell=True)
