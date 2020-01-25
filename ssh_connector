@@ -1,79 +1,80 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""
+SSH command wrapper with find partial host name from Excel IPlists.
+"""
 
 from __future__ import (division, print_function, absolute_import,
                         unicode_literals)
 import argparse
 import os
-import re
 import subprocess
 import sys
 
-from lib.iplist_searcher import IPlistSearcher
-from lib.prepare_logfile import PrepareLogfile
+from lib import get_hostinfo as info
+from lib import prepare_logfile as log
 
 
-def _print_choose_targethost(iplist_infos):
-    order = {}
-    idx = 0
-    for iplist, hostinfo_sheets in iplist_infos.items():
-        print('###############################')
-        print('iplist: {}\n'.format(iplist))
+class Args(object):
+    """
+    Command arguments.
+    """
 
-        for hostinfo in hostinfo_sheets:
-            idx += 1
-            order[idx] = hostinfo
-            print("    {index}:  {host}  {address}".format(
-                index=str(idx),
-                host=hostinfo.name,
-                address=hostinfo.ipaddress))
-        print('###############################')
+    def __init__(self):
+        usage = ("\nPlease specify target hostname: \n"
+                 "   $ python ssh_connector.py -t hogehoge")
+        description = '<< SSH client wrapper tool with using iplist. >>'
 
-    try:
-        input_number = input('Please select target host no. >>>  ')
-        input_number = int(input_number)
-        if input_number not in order:
-            raise KeyError
-    except (NameError, KeyError, KeyboardInterrupt, SyntaxError, ValueError):
-        print('')
-        print('Invalid number was inputed.')
-        sys.exit(1)
+        parser = argparse.ArgumentParser(prog='ssh_connector',
+                                         usage=usage,
+                                         epilog='end',
+                                         add_help=True,
+                                         description=description)
+        parser.add_argument('-t', '--targethost', type=str,
+                            help='ssh target hostname.')
+        parser.add_argument('-i', '--key', type=str, help='auth secret key.')
+        parser.add_argument('-p', '--port', type=str, help='ssh port.')
+        parser.add_argument('-u', '--user', type=str, help='ssh login user.')
+        parser.add_argument('-s', '--server', type=str,
+                            help=(
+                                'ssh login target server.\n'
+                                'if specified this option, '
+                                'this command connects to the server directly '
+                                'without searching IP lists.'))
+        parser.add_argument('-S', '--proxy-server', type=str,
+                            help='proxy server for ssh login.')
+        parser.add_argument('-I', '--proxy-key', type=str,
+                            help='ssh key for proxy server.')
+        parser.add_argument('-U', '--proxy-user', type=str,
+                            help='ssh user for proxy server.')
+        parser.add_argument('-P', '--proxy-port', type=str,
+                            help='ssh port for proxy server.')
 
-    target_hostinfo = order[input_number]
-    print('Connect to {host} : {ip}.'.format(host=target_hostinfo.name,
-                                             ip=target_hostinfo.ipaddress))
-    return target_hostinfo
+        args_instance = parser.parse_args()
+
+        self.partial_server_name = args_instance.targethost
+        self.key = args_instance.key
+        self.port = args_instance.port
+        self.user = args_instance.user
+
+        self.server_name = args_instance.server
+        if self.server_name:
+            self.search_iplist = False
+        else:
+            self.search_iplist = True
+
+        self.proxy_server = args_instance.proxy_server
+        self.proxy_key = args_instance.proxy_key
+        self.proxy_user = args_instance.proxy_user
+        self.proxy_port = args_instance.proxy_port
 
 
-def _sepalate_hitting_host(all_hostinfos, part_of_host):
-    """ Get pattern matched hostname's ipaddress from all iplist files. """
-    new_iplist_infos = {}
-    for iplist, hostinfo_sheets in all_hostinfos.items():
-        iplist_hostinfos = []
-        for sheet in hostinfo_sheets:
-            for hostinfo in sheet:
-                if re.findall(part_of_host, hostinfo.name):
-                    iplist_hostinfos.append(hostinfo)
+def get_args():
+    """
+    Get command arguments.
+    """
 
-        if iplist_hostinfos:
-            new_iplist_infos[iplist] = iplist_hostinfos
-
-    if not new_iplist_infos:
-        print('No target hosts were found.')
-        sys.exit(1)
-
-    return new_iplist_infos
-
-
-def select_targethost(part_of_host):
-    all_hostinfos = IPlistSearcher().get_hostinfos()
-    if not all_hostinfos:
-        print('Host information are nothing.')
-        sys.exit(1)
-
-    iplist_infos = _sepalate_hitting_host(all_hostinfos, part_of_host)
-    target_hostinfo = _print_choose_targethost(iplist_infos)
-    return target_hostinfo
+    return Args()
 
 
 def _gen_linux_command(sshcmd, logfile_path):
@@ -93,9 +94,21 @@ def _is_linux():
     return os.path.isfile('/etc/os-release')
 
 
-def gen_connect_command(key, port, user, target_ip, proxy_server, proxy_key,
-                        proxy_user, proxy_port, logfile_path):
+def gen_connect_command(command_args, target_ip, logfile_path):
+    """
+    Generate 'ssh' command with options.
+    """
+
+    proxy_server = command_args.proxy_server
+    proxy_key = command_args.proxy_key
+    proxy_user = command_args.proxy_user
+    proxy_port = command_args.proxy_port
+    key = command_args.key
+    port = command_args.port
+    user = command_args.user
+
     sshcmd = 'ssh '
+
     if proxy_server:
         proxy_com = "ssh "
 
@@ -135,81 +148,42 @@ def gen_connect_command(key, port, user, target_ip, proxy_server, proxy_key,
     return cmd
 
 
-def connect_ssh(key, port, user, proxy_server, proxy_key, proxy_user,
-                proxy_port, target_hostinfo=None, server=None):
-    if target_hostinfo:
-        target_hostname = target_hostinfo.name
-        target_ip = target_hostinfo.ipaddress
-    elif server:
-        target_hostname = server
-        target_ip = server
+def connect_ssh(command_args, target_hostinfo):
+    """
+    Execute ssh command.
+    """
 
-    logfile_path = PrepareLogfile().prepare_logfile(target_hostname)
-    cmd = gen_connect_command(key, port, user, target_ip,
-                              proxy_server, proxy_key, proxy_user, proxy_port,
-                              logfile_path)
+    target_hostname = target_hostinfo.name
+    target_ip = target_hostinfo.ipaddress
 
-    print('===================================================================')
+    logfile_path = log.PrepareLogfile().prepare_logfile(target_hostname)
+    cmd = gen_connect_command(command_args, target_ip, logfile_path)
+
+    print(
+        '===================================================================')
     subprocess.call(cmd, shell=True)
     sys.exit(0)
 
 
-def main(target_host, priv_key, ssh_port, ssh_user, servername,
-         proxy_server, proxy_key, proxy_user, proxy_port):
-    if servername:
-        connect_ssh(priv_key, ssh_port, ssh_user,
-                    proxy_server, proxy_key, proxy_user, proxy_port,
-                    server=servername)
+def main(command_args):
+    """
+    Prepare target hostname and IP address and execute ssh command.
+    """
 
-    elif target_host:
-        target_hostinfo = select_targethost(target_host)
-        connect_ssh(priv_key, ssh_port, ssh_user,
-                    proxy_server, proxy_key, proxy_user, proxy_port,
-                    target_hostinfo)
+    search_iplist = command_args.search_iplist
 
+    if command_args.partial_server_name:
+        target_name = command_args.partial_server_name
+    elif command_args.server_name:
+        target_name = command_args.server_name
     else:
         print('No target host was specified.')
         sys.exit(1)
 
+    target_hostinfo = info.get_target_hostinfo(target_name, search_iplist)
+    connect_ssh(command_args, target_hostinfo)
+
 
 if __name__ == '__main__':
-    USAGE = ("\nPlease specify target hostname: \n"
-             "   $ python ssh_connector.py -t hogehoge")
-    DESCRIPTION = '<< SSH client wrapper tool with using iplist. >>'
-
-    parser = argparse.ArgumentParser(prog='ssh_connector',
-                                     usage=USAGE,
-                                     epilog='end',
-                                     add_help=True,
-                                     description=DESCRIPTION)
-    parser.add_argument('-t', '--targethost', type=str,
-                        help='ssh target hostname.')
-    parser.add_argument('-i', '--key', type=str, help='auth secret key.')
-    parser.add_argument('-p', '--port', type=str, help='ssh port.')
-    parser.add_argument('-u', '--user', type=str, help='ssh login user.')
-    parser.add_argument('-s', '--server', type=str,
-                        help='ssh login target server.\n'
-                             'if specified this option, this command connects to '
-                             'the server directly without searching IP lists.')
-    parser.add_argument('-S', '--proxy-server', type=str,
-                        help='proxy server for ssh login.')
-    parser.add_argument('-I', '--proxy-key', type=str,
-                        help='ssh key for proxy server.')
-    parser.add_argument('-U', '--proxy-user', type=str,
-                        help='ssh user for proxy server.')
-    parser.add_argument('-P', '--proxy-port', type=str,
-                        help='ssh port for proxy server.')
-
-    args_instance = parser.parse_args()
-    target_host = args_instance.targethost
-    key = args_instance.key
-    port = args_instance.port
-    user = args_instance.user
-    server = args_instance.server
-    proxy_server = args_instance.proxy_server
-    proxy_key = args_instance.proxy_key
-    proxy_user = args_instance.proxy_user
-    proxy_port = args_instance.proxy_port
-
-    main(target_host, key, port, user, server,
-         proxy_server, proxy_key, proxy_user, proxy_port)
+    ARGS = get_args()
+    main(ARGS)

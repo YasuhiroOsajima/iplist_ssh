@@ -2,19 +2,26 @@
 """
 Prepare logfile for ssh command operation.
 """
-from __future__ import division, print_function, absolute_import, unicode_literals
+
+from __future__ import (division, print_function, absolute_import,
+                        unicode_literals)
 
 import os
 import re
-import stat
+# import stat
 import sys
 from datetime import datetime
 
 
 class PrepareLogfile(object):
+    """
+    Prepare log file for ssh loggging.
+    """
+
     def __init__(self):
         self.logfile_dir = \
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'log')
+            os.path.join(os.path.dirname(
+                os.path.abspath(__file__)), '..', 'log')
 
     def _make_logfilepath(self, targethost):
         logfile_name = "{host}_{date}.log".format(
@@ -31,7 +38,7 @@ class PrepareLogfile(object):
         with open(logfile_path, 'w'):
             pass
 
-        #os.chmod(logfile_path, stat.S_IEXEC)
+        # os.chmod(logfile_path, stat.S_IEXEC)
         return os.path.isfile(logfile_path)
 
     @staticmethod
@@ -42,7 +49,7 @@ class PrepareLogfile(object):
         return targethost
 
     def prepare_logfile(self, targethost_input):
-        "Create logfile in advance ssh connection."
+        """ Create logfile in advance ssh connection. """
 
         targethost = self._make_hostname_safe(targethost_input)
         logfile_path = self._make_logfilepath(targethost)
