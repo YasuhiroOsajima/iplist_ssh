@@ -5,7 +5,10 @@ This tool is for Excel file style IPlist users(ex. Japanese traditional IT compa
 
 This tool is made to use on CentOS7 python2 environment.  
 
-    $ pip install PyYAML openpyxl
+    $ pip install -r requirements.txt
+    (or install PyYAML and openpyxls by OS package system like 
+     yum install python-PyYAML python-openpyxl)
+
     $ git clone https://github.com/YasuhiroOsajima/iplist_ssh.git
     $ cd iplist_ssh/
 

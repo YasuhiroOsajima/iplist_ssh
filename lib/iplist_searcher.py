@@ -2,7 +2,8 @@
 """
 Get target hostname's ipaddress list.
 """
-from __future__ import division, print_function, absolute_import, unicode_literals
+from __future__ import (division, print_function, absolute_import,
+                        unicode_literals)
 
 from datetime import datetime
 import os
@@ -19,6 +20,9 @@ except NameError:
     castobj = str
 
 
+# If YAML loading warning is printed, you can set False option.
+# yaml.warnings({'YAMLLoadWarning': False})
+
 class IPlistSearcher(object):
     """
     searcher = IPlistSearcher()
@@ -27,7 +31,8 @@ class IPlistSearcher(object):
     """
 
     def __init__(self):
-        _topdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
+        _topdir = os.path.join(os.path.dirname(
+            os.path.abspath(__file__)), '..')
 
         self._cachefile = os.path.join(_topdir, 'cachefile')
         self._iplistdir = os.path.join(_topdir, 'listfiles')
@@ -97,7 +102,6 @@ class IPlistSearcher(object):
 
         return iplist_hostinfos
 
-
     @staticmethod
     def _initial_cache():
         return {'hostfile': {},
@@ -152,7 +156,8 @@ class IPlistSearcher(object):
         current_filetimes = {}
         for filename in files:
             unixtime = os.stat(self._iplistdir + '/' + filename).st_mtime
-            timestamp = datetime.fromtimestamp(unixtime).strftime('%Y%m%d%H%M%S')
+            timestamp = datetime.fromtimestamp(
+                unixtime).strftime('%Y%m%d%H%M%S')
             current_filetimes[filename] = timestamp
 
         replaced = False
@@ -192,7 +197,7 @@ class IPlistSearcher(object):
                 new_cache_part['filetimes'].pop(iplist)
                 continue
 
-            #create hostinfos by all rows.
+            # create hostinfos by all rows.
             iplist_hostinfos = self._make_host_list(iplist_path)
             if iplist_hostinfos:
                 new_cache_part['addresses'][iplist] = iplist_hostinfos
